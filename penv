@@ -1,0 +1,234 @@
+#!/usr/bin/env perl
+
+# prior art:
+# https://bitbucket.org/jtopjian/penv/src/20bcd9049c95/penv.pl
+# https://github.com/stoned/pll/blob/master/pll
+
+use strict;
+use warnings;
+
+use Config;
+use File::Path qw(mkpath);
+use File::Basename qw(dirname);
+use File::Spec::Functions qw(file_name_is_absolute);
+use Cwd qw(abs_path);
+
+$| = 1; # enable AUTOFLUSH mode
+
+my $perl = $Config{perlpath};
+my $venv_dir = shift || 'venv';
+
+print "Creating virtualenv dir: $venv_dir \n";
+setup_venv($venv_dir);
+
+sub setup_venv {
+    my $venv_dir = shift;
+
+    if ( not file_name_is_absolute($venv_dir) ) {
+        $venv_dir = abs_path() . "/$venv_dir";
+    }
+
+    print "Creating bin subdirectory...";
+    my $bin_dir = create_bin_dir($venv_dir);
+    print "done\n";
+
+    print "Installing a localized cpanm...";
+    my $cpanm = install_cpanm($bin_dir);
+    print "done\n";
+
+    print "Installing a localized local::lib...";
+    install_cpan_module('local::lib', $cpanm, $venv_dir);
+    print "done\n";
+
+    print "Installing a localized carton...";
+    install_cpan_module('Carton', $cpanm, $venv_dir);
+    print "done\n";
+
+#    print "Adding perl wrapper...";
+#    install_perl_wrapper($venv_dir);
+#    print "done\n";
+
+#    print "Adding carton wrapper...";
+#    install_carton_wrapper($venv_dir);
+#    print "done\n";
+
+    print "Adding virtualenv management script...";
+    install_activation_script($venv_dir);
+    print "done\n";
+}
+
+sub install_activation_script {
+    my $venv_dir = shift;
+    my $activation_script = join('/', $venv_dir, 'bin/activate');
+    open (my $fh, '>', $activation_script)
+        or die "[err] Could open activation script: $activation_script : $!\n";
+    while (<DATA>) {
+        $_ =~ s/\{\{ PENV \}\}/$venv_dir/g;
+        print $fh $_;
+    }
+    close($fh);
+}
+
+sub install_carton_wrapper {
+    my $venv_dir = shift;
+    my $carton_file = "${venv_dir}/bin/carton";
+    rename("${venv_dir}/bin/carton", "${venv_dir}/bin/_carton");
+
+    my $script = <<EOF;
+#!/bin/sh
+exec _carton "\$@" --path="$venv_dir"
+EOF
+
+    open(my $fh, '>', $carton_file)
+      or die "[err] Could not open $carton_file : $!\n";
+    print $fh $script, "\n";
+    close($fh);
+    chmod 0755, $carton_file;
+    return 1;
+}
+
+sub install_perl_wrapper {
+    my $venv_dir = shift;
+    my $perl_wrapper_file = join('/', $venv_dir, 'bin', 'perl');
+
+    my $script = <<EOF;
+#!/bin/sh
+exec \$(plenv which perl) -I${venv_dir}/lib/perl5 -Mlocal::lib="$venv_dir" "\$@"
+EOF
+
+    open(my $fh, '>', $perl_wrapper_file)
+      or die "[err] Could not open $perl_wrapper_file : $!\n";
+    print $fh $script, "\n";
+    close($fh);
+    chmod 0755, $perl_wrapper_file;
+    return 1;
+}
+
+sub install_cpan_module {
+    my ($module, $cpanm, $venv_dir) = @_;
+
+    # the --reinstall option to cpanm ensures that that the latest
+    # cpan module and its dependencies gets installed into the virtual
+    # environment directory even if local::lib is already installed in
+    # the standard site_perl directories for the given perl
+
+    my $install_cmd = "$cpanm -q -l $venv_dir --reinstall $module";
+    system($install_cmd) == 0
+        or die "\n[err] Trouble with '$module' install cmd:\n\n$install_cmd\n";
+    return 1;
+}
+
+sub install_cpanm {
+    my $bin_dir = shift;
+    my $cpanm = join('/', $bin_dir, 'cpanm');
+    my $curl_cmd = "curl -L -s -o $cpanm http://cpanmin.us";
+    system($curl_cmd) == 0
+        or die "\n[err] Trouble running curl cmd:\n\n$curl_cmd\n";
+    chmod 0755, $cpanm;
+    return $cpanm;
+}
+
+sub create_bin_dir {
+    my $venv_dir = shift;
+    my $bin_dir = join('/', $venv_dir, 'bin');
+    mkpath($bin_dir) or die "[err] Could not create bin dir:\n\n$bin_dir\n";
+    return $bin_dir;
+}
+
+__DATA__
+
+# This file must be used with "source bin/activate" *from bash*
+# you cannot run it directly
+
+deactivate () {
+    if [ -n "$_OLD_LOCAL_PATH" ]; then
+        PATH="$_OLD_LOCAL_PATH"
+        export PATH
+        unset _OLD_LOCAL_PATH
+    fi
+
+    if [ -n "$_OLD_LOCAL_PS1" ]; then
+        PS1="$_OLD_LOCAL_PS1"
+        export PS1
+        unset _OLD_LOCAL_PS1
+    fi
+
+    if [ ! "$1" = "nondestructive" ]; then
+        MODULEBUILDRC="$_OLD_LOCAL_MODULEBUILDRC"
+        export MODULEBUILDRC
+        unset _OLD_LOCAL_MODULEBUILDRC
+    fi
+
+    if [ ! "$1" = "nondestructive" ]; then
+        PERL_MM_OPT="$_OLD_LOCAL_PERL_MM_OPT"
+        export PERL_MM_OPT
+        unset _OLD_LOCAL_PERL_MM_OPT
+    fi
+
+    if [ ! "$1" = "nondestructive" ]; then
+        PERL5LIB="$_OLD_LOCAL_PERL5LIB"
+        export PERL5LIB
+        unset _OLD_LOCAL_PERL5LIB
+    fi
+
+    if [ ! "$1" = "nondestructive" ]; then
+        PERL_CPANM_OPT="$_OLD_LOCAL_PERL_CPANM_OPT"
+        export PERL_CPANM_OPT
+        unset _OLD_LOCAL_PERL_CPANM_OPT
+    fi
+
+    if [ ! "$1" = "nondestructive" ]; then
+        PERL_CARTON_PATH="$_OLD_LOCAL_PERL_CARTON_PATH"
+        export PERL_CARTON_PATH
+        unset _OLD_LOCAL_PERL_CARTON_PATH
+    fi
+
+    # This should detect bash and zsh, which have a hash command that must
+    # be called to get it to forget past commands.  Without forgetting
+    # past commands the $PATH changes we made may not be respected
+    if [ -n "$BASH" -o -n "$ZSH_VERSION" ]; then
+        hash -r
+    fi
+
+    unset LOCAL_ENV
+    if [ ! "$1" = "nondestructive" ]; then
+        unset -f deactivate
+    fi
+}
+
+# unset irrelevant variables
+deactivate nondestructive
+
+LOCAL_ENV={{ PENV }}
+export LOCAL_ENV
+
+_OLD_LOCAL_PS1="$PS1"
+PS1="(`basename "$LOCAL_ENV"`)$PS1"
+export PS1
+
+_OLD_LOCAL_PERL_CPANM_OPT="$PERL_CPANM_OPT"
+PERL_CPANM_OPT="-l {{ PENV }}"
+export PERL_CPANM_OPT
+
+_OLD_LOCAL_PATH="$PATH"
+_OLD_LOCAL_MODULEBUILDRC="$MODULEBUILDRC"
+_OLD_LOCAL_PERL_MM_OPT="$PERL_MM_OPT"
+_OLD_LOCAL_PERL5LIB="$PERL5LIB"
+
+_OLD_LOCAL_PERL_CARTON_PATH="$PERL_CARTON_PATH"
+
+export PERL_LOCAL_LIB_ROOT="$PERL_LOCAL_LIB_ROOT:$LOCAL_ENV";
+export PERL_MB_OPT="--install_base $LOCAL_ENV";
+export PERL_MM_OPT="INSTALL_BASE=$LOCAL_ENV";
+
+export PERL_CARTON_PATH="$LOCAL_ENV"
+
+export PERL5LIB="${LOCAL_ENV}/lib/perl5:$PERL5LIB";
+export PATH="${LOCAL_ENV}/bin:$PATH";
+
+# This should detect bash and zsh, which have a hash command that must
+# be called to get it to forget past commands.  Without forgetting
+# past commands the $PATH changes we made may not be respected
+if [ -n "$BASH" -o -n "$ZSH_VERSION" ]; then
+    hash -r
+fi
