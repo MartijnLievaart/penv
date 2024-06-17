@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# Based on https://gist.github.com/indraniel/2bf653a6589e3f4edde88409c1f7fd40
+
 # prior art:
 # https://bitbucket.org/jtopjian/penv/src/20bcd9049c95/penv.pl
 # https://github.com/stoned/pll/blob/master/pll
@@ -16,7 +18,7 @@ use Cwd qw(abs_path);
 $| = 1; # enable AUTOFLUSH mode
 
 my $perl = $Config{perlpath};
-my $venv_dir = shift || 'venv';
+my $venv_dir = shift || 'penv';
 
 print "Creating virtualenv dir: $venv_dir \n";
 setup_venv($venv_dir);
@@ -191,6 +193,7 @@ deactivate () {
     fi
 
     unset LOCAL_ENV
+    unset VIRTUAL_ENV
     if [ ! "$1" = "nondestructive" ]; then
         unset -f deactivate
     fi
@@ -199,12 +202,14 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-LOCAL_ENV={{ PENV }}
+LOCAL_ENV="{{ PENV }}"
 export LOCAL_ENV
+VIRTUAL_ENV="{{ PENV }}"
+export VIRTUAL_ENV
 
-_OLD_LOCAL_PS1="$PS1"
-PS1="(`basename "$LOCAL_ENV"`)$PS1"
-export PS1
+#_OLD_LOCAL_PS1="$PS1"
+#PS1="(`basename "$LOCAL_ENV"`)$PS1"
+#export PS1
 
 _OLD_LOCAL_PERL_CPANM_OPT="$PERL_CPANM_OPT"
 PERL_CPANM_OPT="-l {{ PENV }}"
