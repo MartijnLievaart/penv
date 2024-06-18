@@ -193,7 +193,6 @@ deactivate () {
     fi
 
     unset LOCAL_ENV
-    unset VIRTUAL_ENV
     if [ ! "$1" = "nondestructive" ]; then
         unset -f deactivate
     fi
@@ -204,8 +203,6 @@ deactivate nondestructive
 
 LOCAL_ENV="{{ PENV }}"
 export LOCAL_ENV
-VIRTUAL_ENV="{{ PENV }}"
-export VIRTUAL_ENV
 
 #_OLD_LOCAL_PS1="$PS1"
 #PS1="(`basename "$LOCAL_ENV"`)$PS1"

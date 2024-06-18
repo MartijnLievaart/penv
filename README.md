@@ -25,9 +25,7 @@ Activates the new penv
 
 Use localized cpanm and carbon instances
 
-# Notes
+# Environment
 
-I use the environment variable VIRTUAL\_ENV to store the penv, the same as the Python venv. That way
-one can just display that variable in ones prompt and have it work for Python and Perl. Hence
-I also removed the prompt modification that was in the original script, as I already display VIRTUAL\_ENV
-in my prompt if it is set.
+The variable `LOCAL\_ENV` is set to the new virtual perl environment, like the Python `VIRTUAL\_ENV` variable.
+This variable can be used to modify your prompt. Code to do so automatically is left commented out in the activate script.
